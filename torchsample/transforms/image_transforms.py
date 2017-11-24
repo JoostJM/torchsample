@@ -52,7 +52,7 @@ class Grayscale(object):
             _input_dst = _input[0]*0.299 + _input[1]*0.587 + _input[2]*0.114
             _input_gs = _input_dst.repeat(self.channels,1,1)
             outputs.append(_input_gs)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 class RandomGrayscale(object):
 
@@ -101,7 +101,7 @@ class Gamma(object):
         for idx, _input in enumerate(inputs):
             _input = th.pow(_input, self.value)
             outputs.append(_input)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 class RandomGamma(object):
 
@@ -189,7 +189,7 @@ class Brightness(object):
         for idx, _input in enumerate(inputs):
             _input = th.clamp(_input.float().add(self.value).type(_input.type()), 0, 1)
             outputs.append(_input)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 class RandomBrightness(object):
 
@@ -262,7 +262,7 @@ class Saturation(object):
             alpha = 1.0 + self.value
             _in = th.clamp(_blend(_input, _in_gs, alpha), 0, 1)
             outputs.append(_in)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 class RandomSaturation(object):
 
@@ -343,7 +343,7 @@ class Contrast(object):
             channel_means = channel_means.expand_as(_input)
             _input = th.clamp((_input - channel_means) * self.value + channel_means,0,1)
             outputs.append(_input)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 class RandomContrast(object):
 

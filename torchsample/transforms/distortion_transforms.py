@@ -36,7 +36,7 @@ class Scramble(object):
                     _input[:, row*self.blocksize:(row+1)*self.blocksize, column*self.blocksize:(column+1)*self.blocksize]
                     count += 1
             outputs.append(new)
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
  
 
 class RandomChoiceScramble(object):
@@ -134,7 +134,7 @@ class Blur(object):
             _input_blurred = th.from_numpy(_input_blurred).float()
             outputs.append(_input_blurred)
 
-        return outputs if idx > 1 else outputs[0]
+        return outputs if idx >= 1 else outputs[0]
 
 
 class RandomChoiceBlur(object):
