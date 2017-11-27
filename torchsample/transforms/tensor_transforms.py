@@ -550,6 +550,32 @@ class Pad(object):
             return th.from_numpy(x)
 
 
+class PadNumpy(object):
+
+    def __init__(self, size):
+        """
+        Pads a Numpy image to the given size
+        Return a Numpy image / image pair
+
+        Arguments
+        ---------
+        size : tuple or list
+            size of crop
+        """
+        self.size = size
+
+    def __call__(self, x, y=None):
+        shape_diffs = [int(np.ceil((i_s - d_s))) for d_s,i_s in zip(x.shape,self.size)]
+        shape_diffs = np.maximum(shape_diffs,0)
+        pad_sizes = [(int(np.ceil(s/2.)),int(np.floor(s/2.))) for s in shape_diffs]
+        x = np.pad(x, pad_sizes, mode='constant')
+        if y is not None:
+            y = np.pad(y, pad_sizes, mode='constant')
+            return x, y
+        else:
+            return x
+
+
 class RandomFlip(object):
 
     def __init__(self, h=True, v=False, p=0.5):
