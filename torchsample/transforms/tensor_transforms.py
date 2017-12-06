@@ -454,9 +454,10 @@ class RandomCrop(object):
 
     def __call__(self, *inputs):
         h_idx = random.randint(0,inputs[0].size(1)-self.size[0])
-        w_idx = random.randint(0,inputs[1].size(2)-self.size[1])
+        w_idx = random.randint(0,inputs[0].size(2)-self.size[1])
         outputs = []
         for idx, _input in enumerate(inputs):
+            assert inputs[0].size() == _input.size()
             _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1])]
             outputs.append(_input)
         return outputs if idx >= 1 else outputs[0]
@@ -564,16 +565,45 @@ class PadNumpy(object):
         """
         self.size = size
 
-    def __call__(self, x, y=None):
-        shape_diffs = [int(np.ceil((i_s - d_s))) for d_s,i_s in zip(x.shape,self.size)]
+    def __call__(self, *inputs):
+        def_shape = inputs[0].shape
+        shape_diffs = [int(np.ceil((i_s - d_s))) for d_s,i_s in zip(def_shape,self.size)]
         shape_diffs = np.maximum(shape_diffs,0)
         pad_sizes = [(int(np.ceil(s/2.)),int(np.floor(s/2.))) for s in shape_diffs]
-        x = np.pad(x, pad_sizes, mode='constant')
-        if y is not None:
-            y = np.pad(y, pad_sizes, mode='constant')
-            return x, y
-        else:
-            return x
+        outputs = []
+        for idx, _input in enumerate(inputs):
+            assert def_shape == _input.shape
+            _input = np.pad(_input, pad_sizes, mode='constant')
+            outputs.append(_input)
+
+        return outputs if idx >= 1 else outputs[0]
+
+
+class PadFactorNumpy(object):
+
+    def __init__(self, factor):
+        """
+        Pads a Numpy image (WxHxC) and makes sure that it is divisable by 2^factor
+        Return a Numpy image
+
+        Arguments
+        ---------
+        factor : int
+            division factor (to make sure that strided convs and
+            transposed conv produce similar feature maps)
+        """
+        self.factor = float(factor)
+
+    def __call__(self, input):
+
+        inp_shape = input.shape[:2]
+        new_shape = np.ceil(np.divide(inp_shape, self.factor)) * self.factor
+
+        pre_pad  = np.round((new_shape - inp_shape) / 2.0).astype(np.int16)
+        post_pad = ((new_shape - inp_shape) - pre_pad).astype(np.int16)
+
+        output = np.pad(input, ((pre_pad[0], post_pad[0]), (pre_pad[1], post_pad[1]), (0,0)), mode='constant')
+        return output
 
 
 class RandomFlip(object):

@@ -265,7 +265,7 @@ class ModelCheckpoint(Callback):
             whether to save entire model or just weights
             NOTE: only `True` is supported at the moment
         max_save : integer > 0 or -1
-            the max number of models to save. Older model checkpoints
+            the max number of networks to save. Older model checkpoints
             will be overwritten if necessary. Set equal to -1 to have
             no limit
         verbose : integer in {0, 1}

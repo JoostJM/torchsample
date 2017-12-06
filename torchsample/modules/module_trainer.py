@@ -33,7 +33,7 @@ class ModuleTrainer(object):
 
     def __init__(self, model):
         """
-        ModelTrainer for high-level training of Pytorch models
+        ModelTrainer for high-level training of Pytorch networks
 
         Major Parts
         -----------
