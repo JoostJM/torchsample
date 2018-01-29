@@ -6,7 +6,7 @@ Transforms specific to biomedical images
 '''
 
 
-class RangeNormalizeMedic(object):
+class NormalizeMedicPercentile(object):
     """
     Given min_val: float and max_val: float,
     will normalize each channel of the th.*Tensor to
@@ -61,9 +61,36 @@ class RangeNormalizeMedic(object):
         return outputs if idx >= 1 else outputs[0]
 
 
+class NormalizeMedic(object):
+    """
+    Normalises given slice/volume to zero mean
+    and unit standard deviation.
+    """
 
+    def __init__(self,
+                 norm_flag=True):
+        """
+        :param norm_flag: [bool] list of flags for normalisation
+        """
+        self.norm_flag = norm_flag
 
+    def __call__(self, *inputs):
+        # prepare the normalisation flag
+        if isinstance(self.norm_flag, bool):
+            norm_flag = [self.norm_flag] * len(inputs)
+        else:
+            norm_flag = self.norm_flag
 
+        outputs = []
+        for idx, _input in enumerate(inputs):
+            if norm_flag[idx]:
+                # subtract the mean intensity value
+                mean_val = np.mean(_input.numpy().flatten())
+                _input.add(-1 * mean_val)
+                # scale the intensity values to be unit norm
+                std_val = np.std(_input.numpy().flatten())
+                _input = _input.div(float(std_val))
+            outputs.append(_input)
 
-
+        return outputs if idx >= 1 else outputs[0]
 

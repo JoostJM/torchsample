@@ -595,7 +595,6 @@ class PadFactorNumpy(object):
         self.factor = float(factor)
 
     def __call__(self, input):
-
         inp_shape = input.shape[:2]
         new_shape = np.ceil(np.divide(inp_shape, self.factor)) * self.factor
 
