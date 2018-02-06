@@ -23,7 +23,7 @@ class NormalizeMedicPercentile(object):
     def __init__(self,
                  min_val=0.0,
                  max_val=1.0,
-                 perc_threshold=(1.0, 99.0),
+                 perc_threshold=(1.0, 95.0),
                  norm_flag=True):
         """
         Normalize a tensor between a min and max value

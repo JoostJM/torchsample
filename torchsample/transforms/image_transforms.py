@@ -79,7 +79,7 @@ class RandomGrayscale(object):
 
 class Gamma(object):
 
-    def __init__(self, value):
+    def __init__(self, value, flag=True):
         """
         Performs Gamma Correction on the input image. Also known as 
         Power Law Transform. This function transforms the input image 
@@ -95,17 +95,20 @@ class Gamma(object):
             >1 : image will tend to be darker
         """
         self.value = value
+        self.flag = flag
 
     def __call__(self, *inputs):
+        flag = [self.flag] * len(inputs) if isinstance(self.flag, bool) else self.flag
         outputs = []
         for idx, _input in enumerate(inputs):
-            _input = th.pow(_input, self.value)
+            if flag[idx]:
+                _input = th.pow(_input, self.value)
             outputs.append(_input)
         return outputs if idx >= 1 else outputs[0]
 
 class RandomGamma(object):
 
-    def __init__(self, min_val, max_val):
+    def __init__(self, min_val, max_val, flag):
         """
         Performs Gamma Correction on the input image with some
         randomly selected gamma value between min_val and max_val. 
@@ -127,10 +130,11 @@ class RandomGamma(object):
             >1 : image will tend to be darker
         """
         self.values = (min_val, max_val)
+        self.flag = flag
 
     def __call__(self, *inputs):
         value = random.uniform(self.values[0], self.values[1])
-        outputs = Gamma(value)(*inputs)
+        outputs = Gamma(value, self.flag)(*inputs)
         return outputs
 
 class RandomChoiceGamma(object):
@@ -316,7 +320,7 @@ class Contrast(object):
     """
 
     """
-    def __init__(self, value):
+    def __init__(self, value, flag=True):
         """
         Adjust Contrast of image.
 
@@ -333,21 +337,26 @@ class Contrast(object):
             ZERO: channel means
             larger positive value: greater contrast
             larger negative value: greater inverse contrast
+        flag : bool
+            Indicate whether image to be processed or not
         """
         self.value = value
+        self.flag = flag
 
     def __call__(self, *inputs):
+        flag = [self.flag] * len(inputs) if isinstance(self.flag, bool) else self.flag
         outputs = []
         for idx, _input in enumerate(inputs):
-            channel_means = _input.mean(1).mean(2)
-            channel_means = channel_means.expand_as(_input)
-            _input = th.clamp((_input - channel_means) * self.value + channel_means,0,1)
+            if flag[idx]:
+                channel_means = _input.mean(1).mean(1)
+                channel_means = channel_means.expand_as(_input)
+                _input = th.clamp((_input - channel_means) * self.value + channel_means,0,1)
             outputs.append(_input)
         return outputs if idx >= 1 else outputs[0]
 
 class RandomContrast(object):
 
-    def __init__(self, min_val, max_val):
+    def __init__(self, min_val, max_val, flag=True):
         """
         Alter the Contrast of an image with a value randomly selected
         between `min_val` and `max_val`
@@ -358,12 +367,15 @@ class RandomContrast(object):
             min range
         max_val : float
             max range
+        flag: Bool
+            Flag indicating image to be processed
         """
         self.values = (min_val, max_val)
+        self.flag = flag
 
     def __call__(self, *inputs):
         value = random.uniform(self.values[0], self.values[1])
-        outputs = Contrast(value)(*inputs)
+        outputs = Contrast(value, self.flag)(*inputs)
         return outputs
 
 class RandomChoiceContrast(object):
