@@ -453,12 +453,20 @@ class RandomCrop(object):
         self.size = size
 
     def __call__(self, *inputs):
+
+        input_dims = len(inputs[0].size())
         h_idx = random.randint(0,inputs[0].size(1)-self.size[0])
         w_idx = random.randint(0,inputs[0].size(2)-self.size[1])
+        if input_dims == 4:
+            assert len(self.size) == 3
+            z_idx = random.randint(0,inputs[0].size(3)-self.size[2])
         outputs = []
         for idx, _input in enumerate(inputs):
             assert inputs[0].size() == _input.size()
-            _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1])]
+            if input_dims == 3:
+                _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1])]
+            elif input_dims == 4:
+                _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1]), z_idx:(z_idx+self.size[2])]
             outputs.append(_input)
         return outputs if idx >= 1 else outputs[0]
 
