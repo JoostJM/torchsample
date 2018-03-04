@@ -495,38 +495,57 @@ class SpecialCrop(object):
         self.crop_type = crop_type
     
     def __call__(self, x, y=None):
+        input_dims = len(x.size())
         if self.crop_type == 0:
             # center crop
             x_diff  = (x.size(1)-self.size[0])/2.
             y_diff  = (x.size(2)-self.size[1])/2.
             ct_x    = [int(math.ceil(x_diff)),x.size(1)-int(math.floor(x_diff))]
             ct_y    = [int(math.ceil(y_diff)),x.size(2)-int(math.floor(y_diff))]
-            indices = [ct_x,ct_y]        
+            indices = [ct_x,ct_y]
+            if input_dims == 4:
+                z_diff = (x.size(3)-self.size[2])/2.
+                ct_z = [int(math.ceil(z_diff)),x.size(3)-int(math.floor(z_diff))]
+                indices.append(ct_z)
         elif self.crop_type == 1:
             # top left crop
             tl_x = [0, self.size[0]]
             tl_y = [0, self.size[1]]
             indices = [tl_x,tl_y]
+            if input_dims == 4:
+                raise NotImplemented
         elif self.crop_type == 2:
             # top right crop
             tr_x = [0, self.size[0]]
             tr_y = [x.size(2)-self.size[1], x.size(2)]
             indices = [tr_x,tr_y]
+            if input_dims == 4:
+                raise NotImplemented
         elif self.crop_type == 3:
             # bottom right crop
             br_x = [x.size(1)-self.size[0],x.size(1)]
             br_y = [x.size(2)-self.size[1],x.size(2)]
             indices = [br_x,br_y]
+            if input_dims == 4:
+                raise NotImplemented
         elif self.crop_type == 4:
             # bottom left crop
             bl_x = [x.size(1)-self.size[0], x.size(1)]
             bl_y = [0, self.size[1]]
             indices = [bl_x,bl_y]
-        
-        x = x[:,indices[0][0]:indices[0][1],indices[1][0]:indices[1][1]]
+            if input_dims == 4:
+                raise NotImplemented
+
+        if input_dims == 4:
+            x = x[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1], indices[2][0]:indices[2][1]]
+        else:
+            x = x[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1]]
 
         if y is not None:
-            y = y[:,indices[0][0]:indices[0][1],indices[1][0]:indices[1][1]]
+            if input_dims == 4:
+                y = y[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1], indices[2][0]:indices[2][1]]
+            else:
+                y = y[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1]]
             return x, y
         else:
             return x
@@ -581,7 +600,7 @@ class PadNumpy(object):
         outputs = []
         for idx, _input in enumerate(inputs):
             assert def_shape == _input.shape
-            _input = np.pad(_input, pad_sizes, mode='constant')
+            _input = np.pad(_input, pad_sizes, mode='symmetric')
             outputs.append(_input)
 
         return outputs if idx >= 1 else outputs[0]
