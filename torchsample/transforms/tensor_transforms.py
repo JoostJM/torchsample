@@ -627,7 +627,9 @@ class PadFactorNumpy(object):
         pre_pad  = np.round((new_shape - inp_shape) / 2.0).astype(np.int16)
         post_pad = ((new_shape - inp_shape) - pre_pad).astype(np.int16)
 
-        output = np.pad(input, ((pre_pad[0], post_pad[0]), (pre_pad[1], post_pad[1]), (pre_pad[2], post_pad[2])), mode='constant')
+        output = np.pad(input, ((pre_pad[0], post_pad[0]),
+                                (pre_pad[1], post_pad[1]),
+                                (pre_pad[2], post_pad[2])), mode='symmetric')
         return output
 
 
