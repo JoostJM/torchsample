@@ -615,20 +615,19 @@ class PadFactorNumpy(object):
 
         Arguments
         ---------
-        factor : int
+        factor : tuple(int, int, int)
             division factor (to make sure that strided convs and
             transposed conv produce similar feature maps)
         """
-        self.factor = float(factor)
+        self.factor = np.array(factor, dtype=np.float32)
 
     def __call__(self, input):
-        inp_shape = input.shape[:2]
+        inp_shape = input.shape[:3]
         new_shape = np.ceil(np.divide(inp_shape, self.factor)) * self.factor
-
         pre_pad  = np.round((new_shape - inp_shape) / 2.0).astype(np.int16)
         post_pad = ((new_shape - inp_shape) - pre_pad).astype(np.int16)
 
-        output = np.pad(input, ((pre_pad[0], post_pad[0]), (pre_pad[1], post_pad[1]), (0,0)), mode='constant')
+        output = np.pad(input, ((pre_pad[0], post_pad[0]), (pre_pad[1], post_pad[1]), (pre_pad[2], post_pad[2])), mode='constant')
         return output
 
 
