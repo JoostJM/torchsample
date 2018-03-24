@@ -600,7 +600,7 @@ class PadNumpy(object):
         outputs = []
         for idx, _input in enumerate(inputs):
             assert def_shape == _input.shape
-            _input = np.pad(_input, pad_sizes, mode='symmetric')
+            _input = np.pad(_input, pad_sizes, mode='minimum')
             outputs.append(_input)
 
         return outputs if idx >= 1 else outputs[0]
@@ -629,7 +629,7 @@ class PadFactorNumpy(object):
 
         output = np.pad(input, ((pre_pad[0], post_pad[0]),
                                 (pre_pad[1], post_pad[1]),
-                                (pre_pad[2], post_pad[2])), mode='symmetric')
+                                (pre_pad[2], post_pad[2])), mode='minimum')
         return output
 
 

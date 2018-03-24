@@ -86,10 +86,12 @@ class NormalizeMedic(object):
             if norm_flag[idx]:
                 # subtract the mean intensity value
                 mean_val = np.mean(_input.numpy().flatten())
-                _input.add(-1 * mean_val)
+                _input = _input.add(-1.0 * mean_val)
+
                 # scale the intensity values to be unit norm
                 std_val = np.std(_input.numpy().flatten())
                 _input = _input.div(float(std_val))
+
             outputs.append(_input)
 
         return outputs if idx >= 1 else outputs[0]
