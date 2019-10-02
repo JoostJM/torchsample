@@ -27,7 +27,7 @@ class Compose(object):
 
     def __call__(self, *inputs):
         for transform in self.transforms:
-            if not isinstance(inputs, (list,tuple)):
+            if not isinstance(inputs, (list, tuple)):
                 inputs = [inputs]
             inputs = transform(*inputs)
         return inputs
@@ -441,7 +441,7 @@ class Slice2D(object):
 
 class RandomCrop(object):
 
-    def __init__(self, size):
+    def __init__(self, size, channels_first=False):
         """
         Randomly crop a torch tensor
 
@@ -449,31 +449,52 @@ class RandomCrop(object):
         --------
         size : tuple or list
             dimensions of the crop
+
+        channels_first : boolean [False]
+            if input contains more dimensions that self.size (e.g. multi-channel input), this
+            specifies wheter to use the pad the last dimensions (True) or first dimensions (False).
+            Has no effect when len(size) == len(input.shape)
         """
         self.size = size
+        self.channels_first = channels_first
 
     def __call__(self, *inputs):
+        x_size = inputs[0].size()
+        n_dim = len(x_size)
+        n_size_dim = len(self.size)
 
-        input_dims = len(inputs[0].size())
-        h_idx = random.randint(0,inputs[0].size(1)-self.size[0])
-        w_idx = random.randint(0,inputs[0].size(2)-self.size[1])
-        if input_dims == 4:
-            assert len(self.size) == 3
-            z_idx = random.randint(0,inputs[0].size(3)-self.size[2])
+        if n_size_dim < n_dim:
+          shape_slice = slice(-n_size_dim, None) if self.channels_first else slice(None, n_size_dim)
+        else:
+          assert len(inputs[0].shape) == n_size_dim, 'Input has less dimensions than specified size.'
+          shape_slice = slice(None)
+
+        def_shape = x_size[shape_slice]
+
+        slices = []
+        for dim_idx in range(n_size_dim):
+            c_idx = random.randint(0, def_shape[dim_idx] - self.size[dim_idx])
+            crop = slice(c_idx, c_idx + self.size[dim_idx])
+            slices.append(crop)
+
+        if n_size_dim < n_dim:
+            # Insert slice for channels (no cropping)
+            slices.insert(0 if self.channels_first else len(slices), slice(None))
+
+        # convert to tuple to allow slicing
+        slices = tuple(slices)
+
         outputs = []
         for idx, _input in enumerate(inputs):
-            assert inputs[0].size() == _input.size()
-            if input_dims == 3:
-                _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1])]
-            elif input_dims == 4:
-                _input = _input[:, h_idx:(h_idx+self.size[0]),w_idx:(w_idx+self.size[1]), z_idx:(z_idx+self.size[2])]
+            assert def_shape == _input.size()[shape_slice]
+            _input = _input[slices]
             outputs.append(_input)
         return outputs if idx >= 1 else outputs[0]
 
 
 class SpecialCrop(object):
 
-    def __init__(self, size, crop_type=0):
+    def __init__(self, size, crop_type=0, channels_first=False):
         """
         Perform a special crop - one of the four corners or center crop
 
@@ -482,78 +503,72 @@ class SpecialCrop(object):
         size : tuple or list
             dimensions of the crop
 
-        crop_type : integer in {0,1,2,3,4}
+        crop_type : integer or tuple or list of integers in {-1, 0, 1} (1 for each dimension)
+            -1 = bottom/right/posterior crop (i.e. slice [-size:])
             0 = center crop
-            1 = top left crop
-            2 = top right crop
-            3 = bottom right crop
-            4 = bottom left crop
+            1 = top/left/anterior crop (i.e. slice [:size])
+
+        channels_first : boolean [False]
+            if input contains more dimensions that self.size (e.g. multi-channel input), this
+            specifies wheter to use the pad the last dimensions (True) or first dimensions (False).
+            Has no effect when len(size) == len(input.shape)
         """
-        if crop_type not in {0, 1, 2, 3, 4}:
-            raise ValueError('crop_type must be in {0, 1, 2, 3, 4}')
         self.size = size
-        self.crop_type = crop_type
+        if isinstance(crop_type, (list, tuple)):
+            assert len(crop_type) == len(self.size), 'Length of crop_type and size must be equal'
+            for dim in crop_type:
+                assert dim in {-1, 0, 1}, 'crop_type must be in {-1, 0, 1}'
+            self.crop_type = crop_type
+        else:
+            assert crop_type in {-1, 0, 1}, 'crop_type must be in {-1, 0, 1}'
+            self.crop_type = [crop_type] * len(self.size)
+
+        self.channels_first = channels_first
     
-    def __call__(self, x, y=None):
-        input_dims = len(x.size())
-        if self.crop_type == 0:
-            # center crop
-            x_diff  = (x.size(1)-self.size[0])/2.
-            y_diff  = (x.size(2)-self.size[1])/2.
-            ct_x    = [int(math.ceil(x_diff)),x.size(1)-int(math.floor(x_diff))]
-            ct_y    = [int(math.ceil(y_diff)),x.size(2)-int(math.floor(y_diff))]
-            indices = [ct_x,ct_y]
-            if input_dims == 4:
-                z_diff = (x.size(3)-self.size[2])/2.
-                ct_z = [int(math.ceil(z_diff)),x.size(3)-int(math.floor(z_diff))]
-                indices.append(ct_z)
-        elif self.crop_type == 1:
-            # top left crop
-            tl_x = [0, self.size[0]]
-            tl_y = [0, self.size[1]]
-            indices = [tl_x,tl_y]
-            if input_dims == 4:
-                raise NotImplemented
-        elif self.crop_type == 2:
-            # top right crop
-            tr_x = [0, self.size[0]]
-            tr_y = [x.size(2)-self.size[1], x.size(2)]
-            indices = [tr_x,tr_y]
-            if input_dims == 4:
-                raise NotImplemented
-        elif self.crop_type == 3:
-            # bottom right crop
-            br_x = [x.size(1)-self.size[0],x.size(1)]
-            br_y = [x.size(2)-self.size[1],x.size(2)]
-            indices = [br_x,br_y]
-            if input_dims == 4:
-                raise NotImplemented
-        elif self.crop_type == 4:
-            # bottom left crop
-            bl_x = [x.size(1)-self.size[0], x.size(1)]
-            bl_y = [0, self.size[1]]
-            indices = [bl_x,bl_y]
-            if input_dims == 4:
-                raise NotImplemented
+    def __call__(self, *inputs):
+        x_size = inputs[0].size()
+        n_dim = len(x_size)
+        n_size_dim = len(self.size)
 
-        if input_dims == 4:
-            x = x[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1], indices[2][0]:indices[2][1]]
+        if n_size_dim < n_dim:
+            shape_slice = slice(-n_size_dim, None) if self.channels_first else slice(None, n_size_dim)
         else:
-            x = x[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1]]
+            assert len(inputs[0].shape) == n_size_dim, 'Input has less dimensions than specified size.'
+            shape_slice = slice(None)
 
-        if y is not None:
-            if input_dims == 4:
-                y = y[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1], indices[2][0]:indices[2][1]]
-            else:
-                y = y[:, indices[0][0]:indices[0][1], indices[1][0]:indices[1][1]]
-            return x, y
-        else:
-            return x
+        def_shape = x_size[shape_slice]
+
+        slices = []
+        for dim_idx, crop_type in enumerate(self.crop_type):
+            if crop_type == -1:  # bottom crop
+                b = slice(-self.size[dim_idx], None)
+                slices.append(b)
+            elif crop_type == 0:  # center crop
+                diff = (def_shape[dim_idx] - self.size[dim_idx]) / 2.
+                c = slice(int(math.ceil(diff)), -int(math.floor(diff)))
+                slices.append(c)
+            elif crop_type == 1:  # top crop
+                t = slice(None, self.size[dim_idx])
+                slices.append(t)
+
+        if n_size_dim < n_dim:
+            # Insert slice for channels (no cropping)
+            slices.insert(0 if self.channels_first else len(slices), slice(None))
+
+        # convert to tuple to allow slicing
+        slices = tuple(slices)
+
+        outputs = []
+        for idx, _input in enumerate(inputs):
+            assert def_shape == _input.size()[shape_slice]
+            _input = _input[slices]
+            outputs.append(_input)
+        return outputs if idx >= 1 else outputs[0]
 
 
 class Pad(object):
 
-    def __init__(self, size):
+    def __init__(self, size, channels_first=False):
         """
         Pads an image to the given size
 
@@ -561,14 +576,33 @@ class Pad(object):
         ---------
         size : tuple or list
             size of crop
+
+        channels_first : boolean [False]
+            if input contains more dimensions that self.size (e.g. multi-channel input), this
+            specifies wheter to use the pad the last dimensions (True) or first dimensions (False).
+            Has no effect when len(size) == len(input.shape)
         """
         self.size = size
+        self.channels_first = channels_first
 
     def __call__(self, x, y=None):
         x = x.numpy()
-        shape_diffs = [int(np.ceil((i_s - d_s))) for d_s,i_s in zip(x.shape,self.size)]
-        shape_diffs = np.maximum(shape_diffs,0)
-        pad_sizes = [(int(np.ceil(s/2.)),int(np.floor(s/2.))) for s in shape_diffs]
+        n_dim = len(x.shape)
+        n_size_dim = len(self.size)
+
+        if n_size_dim < n_dim:
+            shape_slice = slice(-n_size_dim, None) if self.channels_first else slice(None, n_size_dim)
+        else:
+            assert len(inputs[0].shape) == n_size_dim, 'Input has less dimensions than specified size.'
+            shape_slice = slice(None)
+
+        x_size = x.shape[shape_slice]
+        shape_diffs = [0] * len(x.shape)  # start with 0 padding in all dimensions
+        # calculate shape diffs for size dimensions
+        shape_diffs[shape_slice] = [int(np.ceil((i_s - d_s))) for d_s, i_s in zip(x_size, self.size)]
+
+        shape_diffs = np.maximum(shape_diffs, 0)
+        pad_sizes = [(int(np.ceil(s/2.)), int(np.floor(s/2.))) for s in shape_diffs]
         x = np.pad(x, pad_sizes, mode='constant')
         if y is not None:
             y = y.numpy()
@@ -580,7 +614,7 @@ class Pad(object):
 
 class PadNumpy(object):
 
-    def __init__(self, size):
+    def __init__(self, size, channels_first=False):
         """
         Pads a Numpy image to the given size
         Return a Numpy image / image pair
@@ -589,17 +623,33 @@ class PadNumpy(object):
         ---------
         size : tuple or list
             size of crop
+        channels_first : boolean [False]
+            if input contains more dimensions that self.size (e.g. multi-channel input), this
+            specifies wheter to use the pad the last dimensions (True) or first dimensions (False).
+            Has no effect when len(size) == len(inputs[0].shape)
         """
         self.size = size
+        self.channels_first = channels_first
 
     def __call__(self, *inputs):
-        def_shape = inputs[0].shape
-        shape_diffs = [int(np.ceil((i_s - d_s))) for d_s,i_s in zip(def_shape,self.size)]
-        shape_diffs = np.maximum(shape_diffs,0)
-        pad_sizes = [(int(np.ceil(s/2.)),int(np.floor(s/2.))) for s in shape_diffs]
+        n_dim = len(inputs[0].shape)
+        n_size_dim = len(self.size)
+
+        if n_size_dim < n_dim:
+            shape_slice = slice(-n_size_dim, None) if self.channels_first else slice(None, n_size_dim)
+        else:
+            assert len(inputs[0].shape) == n_size_dim, 'Input has less dimensions than specified size.'
+            shape_slice = slice(None)
+
+        x_size = inputs[0].shape[shape_slice]
+        shape_diffs = [0] * len(inputs[0].shape)  # start with 0 padding in all dimensions
+        # calculate shape diffs for size dimensions
+        shape_diffs[shape_slice] = [int(np.ceil((i_s - d_s))) for d_s, i_s in zip(x_size, self.size)]
+        shape_diffs = np.maximum(shape_diffs, 0)
+        pad_sizes = [(int(np.ceil(s/2.)), int(np.floor(s/2.))) for s in shape_diffs]
         outputs = []
         for idx, _input in enumerate(inputs):
-            assert def_shape == _input.shape
+            assert x_size == _input.shape[shape_slice]
             _input = np.pad(_input, pad_sizes, mode='minimum')
             outputs.append(_input)
 
@@ -608,7 +658,7 @@ class PadNumpy(object):
 
 class PadFactorNumpy(object):
 
-    def __init__(self, factor):
+    def __init__(self, factor, n_size_dim=None, channels_first=False):
         """
         Pads a Numpy image (WxHxC) and makes sure that it is divisable by 2^factor
         Return a Numpy image
@@ -618,19 +668,42 @@ class PadFactorNumpy(object):
         factor : tuple(int, int, int)
             division factor (to make sure that strided convs and
             transposed conv produce similar feature maps)
+        n_size_dim : int [None]
+            specifies the number of dimensions which need to be padded. If n_size_dim = None, all dimensions are padded.
+        channels_first : boolean [False]
+            if input contains more dimensions that self.size (e.g. multi-channel input), this
+            specifies wheter to use the pad the last dimensions (True) or first dimensions (False).
+            Has no effect when n_size_dim is None or equal to len(inputs[0].shape)
         """
         self.factor = np.array(factor, dtype=np.float32)
+        self.n_size_dim = n_size_dim
+        self.channels_first = channels_first
 
-    def __call__(self, input):
-        inp_shape = input.shape[:3]
-        new_shape = np.ceil(np.divide(inp_shape, self.factor)) * self.factor
-        pre_pad  = np.round((new_shape - inp_shape) / 2.0).astype(np.int16)
-        post_pad = ((new_shape - inp_shape) - pre_pad).astype(np.int16)
+    def __call__(self, *inputs):
+        n_dim = len(inputs[0].shape)
+        n_size_dim = self.n_size_dim if self.n_size_dim is not None else n_dim
 
-        output = np.pad(input, ((pre_pad[0], post_pad[0]),
-                                (pre_pad[1], post_pad[1]),
-                                (pre_pad[2], post_pad[2])), mode='minimum')
-        return output
+        if n_size_dim < n_dim:
+            shape_slice = slice(-n_size_dim, None) if self.channels_first else slice(None, n_size_dim)
+        else:
+            assert len(inputs[0].shape) == n_size_dim, 'Input has less dimensions than specified size.'
+            shape_slice = slice(None)
+
+        x_size = inputs[0].shape[shape_slice]
+        new_size = np.ceil(np.divide(x_size, self.factor)) * self.factor
+        pre_pad  = np.round((new_size - x_size) / 2.0).astype(np.int16)
+        post_pad = ((new_size - x_size) - pre_pad).astype(np.int16)
+
+        pad_sizes = [(0, 0)] * n_size_dim
+        pad_sizes[shape_slice] = zip(pre_pad, post_pad)
+
+        outputs = []
+        for idx, _input in enumerate(inputs):
+            assert x_size == _input.shape[x_slice]
+            _input = np.pad(_input, pad_sizes, mode='minimum')
+            outputs.append(_input)
+
+        return outputs if idx >= 1 else outputs[0]
 
 
 class RandomFlip(object):
