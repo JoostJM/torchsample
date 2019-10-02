@@ -199,7 +199,6 @@ def th_affine3d(x, matrix, mode='trilinear', center=True):
     # make a meshgrid of normal coordinates
     coords = th_iterproduct(x.size(1),x.size(2),x.size(3)).float()
 
-
     if center:
         # shift the coordinates so center is the origin
         coords[:,0] = coords[:,0] - (x.size(1) / 2. - 0.5)
@@ -216,7 +215,7 @@ def th_affine3d(x, matrix, mode='trilinear', center=True):
         new_coords[:,1] = new_coords[:,1] + (x.size(2) / 2. - 0.5)
         new_coords[:,2] = new_coords[:,2] + (x.size(3) / 2. - 0.5)
 
-    # map new coordinates using bilinear interpolation
+    # map new coordinates using nearest or trilinear interpolation
     if mode == 'nearest':
         x_transformed = th_nearest_interp3d(x, new_coords)
     elif mode == 'trilinear':
@@ -236,12 +235,9 @@ def th_nearest_interp3d(input, coords):
     coords[:,1] = th.clamp(coords[:,1], 0, input.size(2)-1).round()
     coords[:,2] = th.clamp(coords[:,2], 0, input.size(3)-1).round()
 
-    stride = th.LongTensor(input.stride())[1:].float()
-    idx = coords.mv(stride).long()
+    coords = coords.long()
 
-    input_flat = th_flatten(input)
-
-    mapped_vals = input_flat[idx]
+    mapped_vals = input[:, coords[:, 0], coords[:, 1], coords[:, 2]]
 
     return mapped_vals.view_as(input)
 
@@ -253,35 +249,14 @@ def th_trilinear_interp3d(input, coords):
     # take clamp then floor/ceil of x coords
     x = th.clamp(coords[:,0], 0, input.size(1)-2)
     x0 = x.floor()
-    x1 = x0 + 1
     # take clamp then floor/ceil of y coords
     y = th.clamp(coords[:,1], 0, input.size(2)-2)
     y0 = y.floor()
-    y1 = y0 + 1
     # take clamp then floor/ceil of z coords
     z = th.clamp(coords[:,2], 0, input.size(3)-2)
     z0 = z.floor()
-    z1 = z0 + 1
 
-    stride = th.LongTensor(input.stride())[1:]
-    x0_ix = x0.mul(stride[0]).long()
-    x1_ix = x1.mul(stride[0]).long()
-    y0_ix = y0.mul(stride[1]).long()
-    y1_ix = y1.mul(stride[1]).long()
-    z0_ix = z0.mul(stride[2]).long()
-    z1_ix = z1.mul(stride[2]).long()
-
-    input_flat = th_flatten(input)
-
-    vals_000 = input_flat[x0_ix+y0_ix+z0_ix]
-    vals_100 = input_flat[x1_ix+y0_ix+z0_ix]
-    vals_010 = input_flat[x0_ix+y1_ix+z0_ix]
-    vals_001 = input_flat[x0_ix+y0_ix+z1_ix]
-    vals_101 = input_flat[x1_ix+y0_ix+z1_ix]
-    vals_011 = input_flat[x0_ix+y1_ix+z1_ix]
-    vals_110 = input_flat[x1_ix+y1_ix+z0_ix]
-    vals_111 = input_flat[x1_ix+y1_ix+z1_ix]
-
+    # Calculate the difference between coordinates
     xd = x - x0
     yd = y - y0
     zd = z - z0
@@ -289,14 +264,24 @@ def th_trilinear_interp3d(input, coords):
     ym1 = 1 - yd
     zm1 = 1 - zd
 
-    x_mapped = (vals_000.mul(xm1).mul(ym1).mul(zm1) +
-                vals_100.mul(xd).mul(ym1).mul(zm1) +
-                vals_010.mul(xm1).mul(yd).mul(zm1) +
-                vals_001.mul(xm1).mul(ym1).mul(zd) +
-                vals_101.mul(xd).mul(ym1).mul(zd) +
-                vals_011.mul(xm1).mul(yd).mul(zd) +
-                vals_110.mul(xd).mul(yd).mul(zm1) +
-                vals_111.mul(xd).mul(yd).mul(zd))
+    # Cast to long for indexing and calculate upper index
+    x0 = x0.long()
+    y0 = y0.long()
+    z0 = z0.long()
+    x1 = x0 + 1
+    y1 = y0 + 1
+    z1 = z0 + 1
+
+    x_mapped = (
+       input[:, x0, y0, z0].mul(xm1).mul(ym1).mul(zm1)
+     + input[:, x1, y0, z0].mul(xd).mul(ym1).mul(zm1)
+     + input[:, x0, y1, z0].mul(xm1).mul(yd).mul(zm1)
+     + input[:, x0, y0, z1].mul(xm1).mul(ym1).mul(zd)
+     + input[:, x1, y0, z1].mul(xd).mul(ym1).mul(zd)
+     + input[:, x0, y1, z1].mul(xm1).mul(yd).mul(zd)
+     + input[:, x1, y1, z0].mul(xd).mul(yd).mul(zm1)
+     + input[:, x1, y1, z1].mul(xd).mul(yd).mul(zd)
+    )
 
     return x_mapped.view_as(input)
 
