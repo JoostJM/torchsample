@@ -122,6 +122,97 @@ class RandomFlipSimpleITK(object):
     return outputs if idx >= 1 else outputs[0]
 
 
+class RandomCropSimpleITK(object):
+  def __init__(self, size):
+    """
+    Randomly crop a torch tensor
+
+    Arguments
+    --------
+    size : tuple or list
+        dimensions of the crop
+    """
+    self.size = np.array(size)
+
+  def __call__(self, *inputs):
+    im_size = inputs[0].GetSize()
+    n_dim = inputs[0].GetDimension()
+
+    crop_lbound = []
+    for dim_idx in range(n_dim):
+      c_idx = np.random.randint(0, im_size[dim_idx] - self.size[dim_idx])
+      crop_lbound.append(c_idx)
+
+    crop_lbound = np.array(crop_lbound)
+    crop_ubound = np.array(im_size) - self.size - crop_lbound
+
+    cif = sitk.CropImageFilter()
+    cif.SetLowerBoundaryCropSize(crop_lbound.astype('uint').tolist())
+    cif.SetUpperBoundaryCropSize(crop_ubound.astype('uint').tolist())
+
+    outputs = []
+    for idx, _input in enumerate(inputs):
+      assert im_size == _input.GetSize()
+      outputs.append(cif.Execute(_input))
+    return outputs if idx >= 1 else outputs[0]
+
+
+class SpecialCropSimpleITK(object):
+
+  def __init__(self, size, crop_type=0):
+    """
+    Perform a special crop - one of the four corners or center crop
+
+    Arguments
+    ---------
+    size : tuple or list
+        dimensions of the crop
+
+    crop_type : integer or tuple or list of integers in {-1, 0, 1} (1 for each dimension)
+        -1 = bottom/right/posterior crop (i.e. slice [-size:])
+        0 = center crop
+        1 = top/left/anterior crop (i.e. slice [:size])
+    """
+    self.size = size
+    if isinstance(crop_type, (list, tuple)):
+      assert len(crop_type) == len(self.size), 'Length of crop_type and size must be equal'
+      for dim in crop_type:
+        assert dim in {-1, 0, 1}, 'crop_type must be in {-1, 0, 1}'
+      self.crop_type = crop_type
+    else:
+      assert crop_type in {-1, 0, 1}, 'crop_type must be in {-1, 0, 1}'
+      self.crop_type = [crop_type] * len(self.size)
+
+  def __call__(self, *inputs):
+    im_size = inputs[0].GetSize()
+    n_dim = inputs[0].GetDimension()
+    assert n_dim == len(self.size), 'Length of specified size vector does not match dimensionality of input'
+
+    crop_lbound = []
+    crop_ubound = []
+    for dim_idx, crop_type in enumerate(self.crop_type):
+      if crop_type == -1:  # bottom crop
+        crop_lbound.append(im_size[dim_idx] - self.size[dim_idx])
+        crop_ubound.append(0)
+      elif crop_type == 0:  # center crop
+        diff = (im_size[dim_idx] - self.size[dim_idx]) / 2.
+        crop_lbound.append(np.ceil(diff))
+        crop_ubound.append(np.floor(diff))
+      elif crop_type == 1:  # top crop
+        crop_lbound.append(0)
+        crop_ubound.append(im_size[dim_idx] - self.size[dim_idx])
+
+    cif = sitk.CropImageFilter()
+    cif.SetLowerBoundaryCropSize(np.array(crop_lbound).astype('uint').tolist())
+    cif.SetUpperBoundaryCropSize(np.array(crop_ubound).astype('uint').tolist())
+
+    outputs = []
+    for idx, _input in enumerate(inputs):
+      assert im_size == _input.GetSize()
+      outputs.append(cif.Execute(_input))
+    return outputs if idx >= 1 else outputs[0]
+
+
 class RandomAffineSimpleITK(object):
   def __init__(self,
                rotation_range=None,
