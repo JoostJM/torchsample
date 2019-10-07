@@ -15,6 +15,83 @@ class SimpleITKtoTensor(object):
     return outputs if idx >= 1 else outputs[0]
 
 
+class NormalizeSimpleITK(object):
+
+  def __init__(self, norm_flag=True):
+    """
+    :param norm_flag: [bool] list of flags for normalisation
+    """
+    self.norm_flag = norm_flag
+
+  def __call__(self, *inputs):
+    # prepare the normalisation flag
+    if isinstance(self.norm_flag, bool):
+      norm_flag = [self.norm_flag] * len(inputs)
+    else:
+      norm_flag = self.norm_flag
+
+    nif = sitk.NormalizeImageFilter()
+
+    outputs = []
+    for norm_flag, _input in zip(norm_flag, inputs):
+      if norm_flag:
+        outputs.append(nif.Execute(_input))
+      else:
+        outputs.append(_input)
+
+    return outputs[0] if len(outputs) == 1 else outputs
+
+
+class NormalizePercentileSimpleITK(object):
+
+  def __init__(self,
+               min_val=0.0,
+               max_val=1.0,
+               perc_threshold=(1.0, 95.0),
+               norm_flag=True):
+    """
+    Normalize a SimpleITK Image between a min and max value
+    :param min_val: (float) lower bound of normalized tensor
+    :param max_val: (float) upper bound of normalized tensor
+    :param perc_threshold: (float, float) percentile of image intensities used for scaling
+    :param norm_flag: [bool] list of flags for normalisation
+    """
+
+    self.min_val = min_val
+    self.max_val = max_val
+    self.perc_threshold = perc_threshold
+    self.norm_flag = norm_flag
+
+  def __call__(self, *inputs):
+    # prepare the normalisation flag
+    if isinstance(self.norm_flag, bool):
+      norm_flag = [self.norm_flag] * len(inputs)
+    else:
+      norm_flag = self.norm_flag
+
+    outputs = []
+    for norm_flag, _input in zip(norm_flag, inputs):
+      if norm_flag:
+        # determine the percentiles and threshold the outliers
+        im_arr = sitk.GetArrayFromImage(_input)
+        _min_val, _max_val = np.percentile(im_arr, self.perc_threshold)
+
+        # scale the intensity values
+        a = (self.max_val - self.min_val) / (_max_val - _min_val)
+        im_arr -= _min_val
+        im_arr *= a
+        im_arr[im_arr < self.min_val] = self.min_val
+        im_arr[im_arr > self.max_val] = self.max_val
+
+        im = sitk.GetImageFromArray(im_arr)
+        im.CopyInformation(_input)
+        outputs.append(im)
+      else:
+        outputs.append(_input)
+
+      return outputs[0] if len(outputs) == 1 else outputs
+
+
 class PadSimpleITK(object):
 
   def __init__(self, size):
