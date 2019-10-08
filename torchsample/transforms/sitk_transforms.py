@@ -122,7 +122,17 @@ class PadSimpleITK(object):
     outputs = []
     for idx, _input in enumerate(inputs):
       assert np.array_equal(im_size, np.array(_input.GetSize()))
-      outputs.append(pif.Execute(_input))
+
+      if _input.GetNumberOfComponentsPerPixel() > 1:
+        # SimpleITK Constant pad only works for non-vector type images, so pad
+        # each image channel separately, then join them again.
+        channel_output = []
+        for c_idx in range(_input.GetNumberOfComponentsPerPixel()):
+          channel = sitk.VectorIndexSelectionCast(_input, c_idx)
+          channel_output.append(pif.Execute(channel))
+        outputs.append(sitk.Compose(channel_output))
+      else:
+        outputs.append(pif.Execute(_input))
 
     return outputs if idx >= 1 else outputs[0]
 
@@ -157,7 +167,17 @@ class PadFactorSimpleITK(object):
     outputs = []
     for idx, _input in enumerate(inputs):
       assert np.array_equal(im_size, np.array(_input.GetSize()))
-      outputs.append(pif.Execute(_input))
+
+      if _input.GetNumberOfComponentsPerPixel() > 1:
+        # SimpleITK Constant pad only works for non-vector type images, so pad
+        # each image channel separately, then join them again.
+        channel_output = []
+        for c_idx in range(_input.GetNumberOfComponentsPerPixel()):
+          channel = sitk.VectorIndexSelectionCast(_input, c_idx)
+          channel_output.append(pif.Execute(channel))
+        outputs.append(sitk.Compose(channel_output))
+      else:
+        outputs.append(pif.Execute(_input))
 
     return outputs if idx >= 1 else outputs[0]
 
