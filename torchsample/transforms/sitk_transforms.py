@@ -107,8 +107,8 @@ class PadSimpleITK(object):
     self.size = size
 
   def __call__(self, *inputs):
-    im_size = inputs[0].GetSize
-    shape_diffs = [int(np.ceil((i_s - d_s))) for d_s, i_s in zip(im_size, self.size)]
+    im_size = inputs[0].GetSize()
+    shape_diffs = np.ceil(im_size - self.size).astype(int)
     shape_diffs = np.maximum(shape_diffs, 0)
 
     if np.max(shape_diffs) == 0:  # No padding required
@@ -116,8 +116,8 @@ class PadSimpleITK(object):
 
     pif = sitk.ConstantPadImageFilter()
     pif.SetConstant(0)
-    pif.SetPadLowerBound((int(np.ceil(s / 2.)) for s in shape_diffs))
-    pif.SetPadUpperBound((int(np.floor(s / 2.)) for s in shape_diffs))
+    pif.SetPadLowerBound(np.ceil(shape_diffs / 2.).astype(int).tolist())
+    pif.SetPadUpperBound(np.floor(shape_diffs / 2.).astype(int).tolist())
 
     outputs = []
     for idx, _input in enumerate(inputs):
@@ -143,7 +143,7 @@ class PadFactorSimpleITK(object):
     self.factor = np.array(factor, dtype=np.float32)
 
   def __call__(self, *inputs):
-    im_size = inputs[0].GetSize
+    im_size = inputs[0].GetSize()
 
     rem = np.remainder(im_size, self.factor)  # compute the remainder
     if np.max(rem) == 0:  # No padding required
@@ -151,8 +151,8 @@ class PadFactorSimpleITK(object):
 
     pif = sitk.ConstantPadImageFilter()
     pif.SetConstant(0)
-    pif.SetPadLowerBound((int(np.ceil(s / 2.0)) for s in rem))
-    pif.SetPadUpperBound((int(np.floor(s / 2.0)) for s in rem))
+    pif.SetPadLowerBound(np.ceil(rem / 2.).astype(int).tolist())
+    pif.SetPadUpperBound(np.floor(rem / 2.).astype(int).tolist())
 
     outputs = []
     for idx, _input in enumerate(inputs):
