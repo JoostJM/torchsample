@@ -8,10 +8,10 @@ class SimpleITKtoTensor(object):
   def __call__(self, *inputs):
     outputs = []
     for idx, _input in enumerate(inputs):
-      _output = th.from_numpy(sitk.GetArrayFromImage(_input))
+      _output = sitk.GetArrayFromImage(_input)
       if _input.GetNumberOfComponentsPerPixel() == 1:
         _output = np.expand_dims(_output, -1)
-      outputs.append(_output)
+      outputs.append(th.from_numpy(_output))
     return outputs if idx >= 1 else outputs[0]
 
 
