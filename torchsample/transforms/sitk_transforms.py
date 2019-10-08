@@ -104,11 +104,11 @@ class PadSimpleITK(object):
     size : tuple or list
         size of crop in x, y, z
     """
-    self.size = size
+    self.size = np.array(size)
 
   def __call__(self, *inputs):
-    im_size = inputs[0].GetSize()
-    shape_diffs = np.ceil(im_size - self.size).astype(int)
+    im_size = np.array(inputs[0].GetSize())
+    shape_diffs = np.ceil(self.size - im_size).astype(int)
     shape_diffs = np.maximum(shape_diffs, 0)
 
     if np.max(shape_diffs) == 0:  # No padding required
@@ -121,7 +121,7 @@ class PadSimpleITK(object):
 
     outputs = []
     for idx, _input in enumerate(inputs):
-      assert im_size == _input.GetSize()
+      assert np.array_equal(im_size, np.array(_input.GetSize()))
       outputs.append(pif.Execute(_input))
 
     return outputs if idx >= 1 else outputs[0]
@@ -143,7 +143,7 @@ class PadFactorSimpleITK(object):
     self.factor = np.array(factor, dtype=np.float32)
 
   def __call__(self, *inputs):
-    im_size = inputs[0].GetSize()
+    im_size = np.array(inputs[0].GetSize())
 
     rem = np.remainder(im_size, self.factor)  # compute the remainder
     if np.max(rem) == 0:  # No padding required
@@ -156,7 +156,7 @@ class PadFactorSimpleITK(object):
 
     outputs = []
     for idx, _input in enumerate(inputs):
-      assert im_size == _input.GetSize()
+      assert np.array_equal(im_size, np.array(_input.GetSize()))
       outputs.append(pif.Execute(_input))
 
     return outputs if idx >= 1 else outputs[0]
