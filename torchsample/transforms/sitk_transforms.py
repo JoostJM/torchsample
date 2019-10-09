@@ -155,14 +155,14 @@ class PadFactorSimpleITK(object):
   def __call__(self, *inputs):
     im_size = np.array(inputs[0].GetSize())
 
-    rem = np.remainder(im_size, self.factor)  # compute the remainder
-    if np.max(rem) == 0:  # No padding required
+    pad = self.factor - np.remainder(im_size, self.factor)  # compute the remainder
+    if np.max(pad) == 0:  # No padding required
       return inputs
 
     pif = sitk.ConstantPadImageFilter()
     pif.SetConstant(0)
-    pif.SetPadLowerBound(np.ceil(rem / 2.).astype(int).tolist())
-    pif.SetPadUpperBound(np.floor(rem / 2.).astype(int).tolist())
+    pif.SetPadLowerBound(np.ceil(pad / 2.).astype(int).tolist())
+    pif.SetPadUpperBound(np.floor(pad / 2.).astype(int).tolist())
 
     outputs = []
     for idx, _input in enumerate(inputs):
